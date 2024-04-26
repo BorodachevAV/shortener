@@ -10,7 +10,7 @@ import (
 )
 
 const Charset = "abcdefghijklmnopqrstuvwxyz" +
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 var seededRand *rand.Rand = rand.New(
 	rand.NewSource(time.Now().UnixNano()))
@@ -40,7 +40,10 @@ func shortener(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/plain")
 		w.Header().Add("Host", "localhost:8080")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(body))
+		_, err := w.Write([]byte(body))
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if r.Method == http.MethodGet {
