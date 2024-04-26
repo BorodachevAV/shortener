@@ -10,20 +10,21 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST requests are allowed!", http.StatusMethodNotAllowed)
 		return
 	}
-	if r.Method != http.MethodPost {
+	if r.Method == http.MethodGet {
 		body := "http://localhost:8080/EwHXdJfB"
 
 		w.Header().Add("Content-Type", "text/plain")
 		w.Header().Add("Host", "localhost:8080")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(body))
-	} else if r.Method != http.MethodGet {
+	}
+
+	if r.Method == http.MethodPost {
 		shortUrl := strings.Split(r.RequestURI, "/")
-		if len(shortUrl) > 2 {
+		if len(shortUrl) != 2 || shortUrl[1] == "" {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-
 		body := "Location: https://practicum.yandex.ru/"
 		w.WriteHeader(http.StatusTemporaryRedirect)
 		w.Write([]byte(body))
@@ -34,7 +35,6 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc(`/`, shorten)
-	//mux.HandleFunc(`/qwerty`, getUrl)
 	err := http.ListenAndServe(`:8080`, mux)
 	if err != nil {
 		panic(err)
