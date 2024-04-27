@@ -9,12 +9,14 @@ import (
 	"time"
 )
 
-const Charset = "abcdefghijklmnopqrstuvwxyz" +
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// алфавит для коротких url
+const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// генерим сид
 var seededRand *rand.Rand = rand.New(
 	rand.NewSource(time.Now().UnixNano()))
 
+// генерим короткий url
 func randString(length int) string {
 	b := make([]byte, length)
 	for i := range b {
@@ -23,19 +25,25 @@ func randString(length int) string {
 	return string(b)
 }
 
+// создаем хранилище url
 var urlsStorage = make(map[string]string)
 
+// хендлер запросов
 func shortener(w http.ResponseWriter, r *http.Request) {
+	//проверка метода, обрабатываем только GET и POST
 	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Only POST or GET requests are allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
+	//обработка POST
 	if r.Method == http.MethodPost {
-
-		shortUrl := randString(8)
+		//читаем тело
 		urlFromRequest, _ := io.ReadAll(r.Body)
+		//генерим короткий url
+		shortUrl := randString(8)
+		// сохраняем в мапе
 		urlsStorage[shortUrl] = string(urlFromRequest)
+		//заполняем ответ
 		body := fmt.Sprintf("http://localhost:8080/%s", shortUrl)
 		w.Header().Add("Content-Type", "text/plain")
 		w.Header().Add("Host", "localhost:8080")
@@ -45,14 +53,24 @@ func shortener(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 	}
-
+	//обработка GET
 	if r.Method == http.MethodGet {
+		//делим url на части
 		shortUrl := strings.Split(r.RequestURI, "/")
+		//если адрес не сходится с ожидаемым форматом отдаем 400
 		if len(shortUrl) != 2 || shortUrl[1] == "" {
 			http.Error(w, "Bad Request, not short url", http.StatusBadRequest)
 			return
 		}
-		w.Header().Add("Location", urlsStorage[shortUrl[1]])
+		//проверяем в мапе наличие ключа, отдаем 404 если его нет
+		val, ok := urlsStorage[shortUrl[1]]
+		if ok {
+			w.Header().Add("Location", val)
+		} else {
+			http.Error(w, "short url not found", http.StatusNotFound)
+			return
+		}
+		//редиректим на полный адрес из мапы
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 
