@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -14,20 +15,21 @@ import (
 const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 // генерим сид
-var seededRand *rand.Rand = rand.New(
-	rand.NewSource(time.Now().UnixNano()))
+var (
+	urlsStorage            = make(map[string]string)
+	seededRand  *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	a                      = flag.String("a", "localhost:8080", "shortener host")
+	b                      = flag.String("b", "localhost:8080", "response host")
+)
 
 // генерим короткий url
 func randString(length int) string {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = Charset[seededRand.Intn(len(Charset))]
+	randB := make([]byte, length)
+	for i := range randB {
+		randB[i] = Charset[seededRand.Intn(len(Charset))]
 	}
-	return string(b)
+	return string(randB)
 }
-
-// создаем хранилище url
-var urlsStorage = make(map[string]string)
 
 func shorten(w http.ResponseWriter, r *http.Request) {
 
@@ -42,7 +44,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	// сохраняем в мапе
 	urlsStorage[shortUrl] = string(urlFromRequest)
 	//заполняем ответ
-	body := fmt.Sprintf("http://localhost:8080/%s", shortUrl)
+	body := fmt.Sprintf("http://%s/%s", b, shortUrl)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", "localhost:8080")
 	w.WriteHeader(http.StatusCreated)
@@ -71,11 +73,10 @@ func expand(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 func main() {
+	flag.Parse()
 	r := chi.NewRouter()
 	r.Post(`/`, shorten)
 	r.Get(`/{id}`, expand)
-	//mux := http.NewServeMux()
-	//mux.HandleFunc(`/`, shortener)
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(*a, r))
 
 }
