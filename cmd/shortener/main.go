@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+type Config struct {
+	serverAddress string `env:"SERVER_ADDRESS"`
+	baseUrl       string `env:"BASE_URL"`
+}
+
 // алфавит для коротких url
 const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -18,8 +23,9 @@ const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 var (
 	urlsStorage            = make(map[string]string)
 	seededRand  *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	a                      = flag.String("a", "localhost:8080", "shortener host")
-	b                      = flag.String("b", "localhost:8080", "response host")
+	cfg         Config
+	a           = flag.String("a", "localhost:8080", "shortener host")
+	b           = flag.String("b", "localhost:8080", "response host")
 )
 
 // генерим короткий url
@@ -44,9 +50,15 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	// сохраняем в мапе
 	urlsStorage[shortUrl] = string(urlFromRequest)
 	//заполняем ответ
-	body := fmt.Sprintf("http://%s/%s", b, shortUrl)
+	if cfg.serverAddress == "" {
+		cfg.serverAddress = *a
+	}
+	if cfg.baseUrl == "" {
+		cfg.baseUrl = *b
+	}
+	body := fmt.Sprintf("http://%s/%s", cfg.baseUrl, shortUrl)
 	w.Header().Add("Content-Type", "text/plain")
-	w.Header().Add("Host", "localhost:8080")
+	w.Header().Add("Host", fmt.Sprintf("%s", cfg.serverAddress))
 	w.WriteHeader(http.StatusCreated)
 	_, err := w.Write([]byte(body))
 	if err != nil {
@@ -59,14 +71,15 @@ func expand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shortUrl := chi.URLParam(r, "id")
-	//если адрес не сходится с ожидаемым форматом отдаем 400
-
+	fmt.Println(fmt.Sprintf("id is %s", shortUrl))
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
 	val, ok := urlsStorage[shortUrl]
+
 	if ok {
 		w.Header().Add("Location", val)
 	} else {
 		http.Error(w, "short url not found", http.StatusNotFound)
+		w.Header().Add("Location", fmt.Sprint(urlsStorage))
 		return
 	}
 	//редиректим на полный адрес из мапы
@@ -74,9 +87,12 @@ func expand(w http.ResponseWriter, r *http.Request) {
 }
 func main() {
 	flag.Parse()
+	if cfg.serverAddress == "" {
+		cfg.serverAddress = *a
+	}
 	r := chi.NewRouter()
 	r.Post(`/`, shorten)
 	r.Get(`/{id}`, expand)
-	log.Fatal(http.ListenAndServe(*a, r))
+	log.Fatal(http.ListenAndServe(cfg.serverAddress, r))
 
 }
