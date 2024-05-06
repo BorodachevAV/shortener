@@ -34,14 +34,11 @@ func TestShortener(t *testing.T) {
 		respBytes := buf.String()
 		respBytes = respBytes[len(respBytes)-8:]
 
-		request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/"), nil)
+		request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/{id}"), nil)
 		rctx := chi.NewRouteContext()
 		rctx.URLParams.Add("id", respBytes)
-		request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
+		request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
 		w = httptest.NewRecorder()
-		expand := func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "key") // "value"
-		}
 		expand(w, request)
 		res := w.Result()
 		assert.Equal(t, 307, res.StatusCode)
