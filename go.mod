@@ -1,6 +1,6 @@
 module github.com/BorodachevAV/shortener
 
-go 1.22.2
+go 1.21.9
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible // indirect
