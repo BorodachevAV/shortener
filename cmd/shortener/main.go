@@ -21,7 +21,7 @@ var (
 	seededRand  *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	cfg                    = config.New()
 	a                      = flag.String("a", "localhost:8080", "shortener host")
-	b                      = flag.String("b", "localhost:8080", "response host")
+	b                      = flag.String("b", "http://localhost:8080", "response host")
 )
 
 // генерим короткий url
@@ -72,12 +72,11 @@ func expand(w http.ResponseWriter, r *http.Request) {
 
 	if ok {
 		w.Header().Add("Location", val)
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {
 		http.Error(w, "short url not found", http.StatusNotFound)
 		return
 	}
-	//редиректим на полный адрес из мапы
-	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 func main() {
 	flag.Parse()
