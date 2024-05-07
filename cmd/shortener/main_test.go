@@ -19,6 +19,7 @@ func TestShortener(t *testing.T) {
 
 		res := w.Result()
 		assert.Equal(t, 404, res.StatusCode)
+		res.Body.Close()
 	})
 
 	t.Run("Get 307", func(t *testing.T) {
@@ -28,6 +29,7 @@ func TestShortener(t *testing.T) {
 		w := httptest.NewRecorder()
 		shorten(w, request)
 		shortURL := w.Result().Body
+		shortURL.Close()
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(shortURL)
 		respBytes := buf.String()
@@ -40,6 +42,7 @@ func TestShortener(t *testing.T) {
 		w = httptest.NewRecorder()
 		expand(w, request)
 		res := w.Result()
+		res.Body.Close()
 		assert.Equal(t, 307, res.StatusCode)
 	})
 
@@ -50,6 +53,7 @@ func TestShortener(t *testing.T) {
 		shorten(w, request)
 
 		res := w.Result()
+		res.Body.Close()
 		assert.Equal(t, 201, res.StatusCode)
 	})
 }
