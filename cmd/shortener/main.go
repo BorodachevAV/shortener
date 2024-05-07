@@ -49,10 +49,10 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	if cfg.Cfg.ServerAddress == "" {
 		cfg.Cfg.ServerAddress = *a
 	}
-	if cfg.Cfg.BaseUrl == "" {
-		cfg.Cfg.BaseUrl = *b
+	if cfg.Cfg.BaseURL == "" {
+		cfg.Cfg.BaseURL = *b
 	}
-	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseUrl, shortURL)
+	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
