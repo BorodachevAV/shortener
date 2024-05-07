@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -28,13 +27,13 @@ func TestShortener(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", bodyReader)
 		w := httptest.NewRecorder()
 		shorten(w, request)
-		shortUrl := w.Result().Body
+		shortURL := w.Result().Body
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(shortUrl)
+		buf.ReadFrom(shortURL)
 		respBytes := buf.String()
 		respBytes = respBytes[len(respBytes)-8:]
 
-		request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/{id}"), nil)
+		request = httptest.NewRequest(http.MethodGet, "/{id}", nil)
 		rctx := chi.NewRouteContext()
 		rctx.URLParams.Add("id", respBytes)
 		request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))

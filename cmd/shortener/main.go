@@ -42,9 +42,9 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	//читаем тело
 	urlFromRequest, _ := io.ReadAll(r.Body)
 	//генерим короткий url
-	shortUrl := randString(8)
+	shortURL := randString(8)
 	// сохраняем в мапе
-	urlsStorage[shortUrl] = string(urlFromRequest)
+	urlsStorage[shortURL] = string(urlFromRequest)
 	//заполняем ответ
 	if cfg.Cfg.ServerAddress == "" {
 		cfg.Cfg.ServerAddress = *a
@@ -52,9 +52,9 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	if cfg.Cfg.BaseUrl == "" {
 		cfg.Cfg.BaseUrl = *b
 	}
-	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseUrl, shortUrl)
+	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseUrl, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
-	w.Header().Add("Host", fmt.Sprintf("%s", cfg.Cfg.ServerAddress))
+	w.Header().Add("Host", cfg.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
 	_, err := w.Write([]byte(body))
 	if err != nil {
@@ -66,9 +66,9 @@ func expand(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	shortUrl := chi.URLParam(r, "id")
+	shortURL := chi.URLParam(r, "id")
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
-	val, ok := urlsStorage[shortUrl]
+	val, ok := urlsStorage[shortURL]
 
 	if ok {
 		w.Header().Add("Location", val)
