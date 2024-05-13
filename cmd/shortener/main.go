@@ -9,6 +9,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
 )
 
@@ -17,11 +19,9 @@ const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 // генерим сид
 var (
-	urlsStorage            = make(map[string]string)
+	urlsStorage sync.Map
 	seededRand  *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	cfg                    = config.New()
-	a                      = flag.String("a", "localhost:8080", "shortener host")
-	b                      = flag.String("b", "http://localhost:8080", "response host")
 )
 
 // генерим короткий url
@@ -35,43 +35,35 @@ func randString(length int) string {
 
 func shorten(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST requests are allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	//читаем тело
 	urlFromRequest, _ := io.ReadAll(r.Body)
+
+	_, err := url.Parse(string(urlFromRequest))
+	if err != nil {
+		http.Error(w, "not url", http.StatusBadRequest)
+		return
+	}
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-	urlsStorage[shortURL] = string(urlFromRequest)
+	urlsStorage.Store(shortURL, urlFromRequest)
 	//заполняем ответ
-	if cfg.Cfg.ServerAddress == "" {
-		cfg.Cfg.ServerAddress = *a
-	}
-	if cfg.Cfg.BaseURL == "" {
-		cfg.Cfg.BaseURL = *b
-	}
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
-	_, err := w.Write([]byte(body))
+	_, err = w.Write([]byte(body))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 func expand(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET requests are allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	shortURL := chi.URLParam(r, "id")
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
-	val, ok := urlsStorage[shortURL]
+	val, ok := urlsStorage.Load(shortURL)
 
 	if ok {
-		w.Header().Add("Location", val)
+		w.Header().Add("Location", val.(string))
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {
 		http.Error(w, "short url not found", http.StatusNotFound)
@@ -79,9 +71,14 @@ func expand(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func main() {
+	a := flag.String("a", "localhost:8080", "shortener host")
+	b := flag.String("b", "http://localhost:8080", "response host")
 	flag.Parse()
 	if cfg.Cfg.ServerAddress == "" {
 		cfg.Cfg.ServerAddress = *a
+	}
+	if cfg.Cfg.BaseURL == "" {
+		cfg.Cfg.BaseURL = *b
 	}
 	r := chi.NewRouter()
 	r.Post(`/`, shorten)
