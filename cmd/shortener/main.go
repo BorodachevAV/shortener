@@ -46,7 +46,8 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-	urlsStorage.Store(shortURL, urlFromRequest)
+
+	urlsStorage.Store(shortURL, string(urlFromRequest))
 	//заполняем ответ
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
