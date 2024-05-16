@@ -55,7 +55,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(body))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf(err.Error())
 	}
 }
 func expand(w http.ResponseWriter, r *http.Request) {
