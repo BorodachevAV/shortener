@@ -138,7 +138,7 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 	//заполняем ответ
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	m := make(map[string]string)
-	m["response"] = body
+	m["result"] = body
 	respBody, _ := json.Marshal(m)
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
