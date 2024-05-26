@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,7 +36,36 @@ type ShortenJsonRResponse struct {
 	result string
 }
 
-func WithLogging(h http.Handler) http.Handler {
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
+}
+
+func (w gzipWriter) Write(b []byte) (int, error) {
+	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
+	return w.Writer.Write(b)
+}
+
+func gzipHandle(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
+		}
+		defer gz.Close()
+
+		w.Header().Add("Content-Encoding", "gzip")
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
+
+func withLogging(h http.Handler) http.Handler {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		// вызываем панику, если ошибка
@@ -88,23 +118,20 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 
 	//читаем тело
 	urlFromRequest, _ := io.ReadAll(r.Body)
-
-	_, err := url.Parse(string(urlFromRequest))
-	if err != nil {
-		http.Error(w, "not url", http.StatusBadRequest)
-		return
-	}
+	reader := bytes.NewReader(urlFromRequest)
+	gzreader, _ := gzip.NewReader(reader)
+	output, _ := io.ReadAll(gzreader)
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
 
-	urlsStorage.Store(shortURL, string(urlFromRequest))
+	urlsStorage.Store(shortURL, string(output))
 	//заполняем ответ
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte(body))
+	_, err := w.Write([]byte(body))
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -122,12 +149,6 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.Unmarshal(buf.Bytes(), &req)
-
-	_, err = url.Parse(req.URL)
-	if err != nil {
-		http.Error(w, "not url", http.StatusBadRequest)
-		return
-	}
 
 	//генерим короткий url
 	shortURL := randString(8)
@@ -173,7 +194,8 @@ func main() {
 		cfg.Cfg.BaseURL = *b
 	}
 	r := chi.NewRouter()
-	r.Use(WithLogging)
+	r.Use(withLogging)
+	r.Use(gzipHandle)
 	r.Post(`/`, shorten)
 	r.Post(`/api/shorten`, shortenJson)
 	r.Get(`/{id}`, expand)
