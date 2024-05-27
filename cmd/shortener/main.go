@@ -13,6 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -124,14 +125,18 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-
+	_, err := url.Parse(string(output))
+	if err != nil {
+		http.Error(w, "not url", http.StatusBadRequest)
+		return
+	}
 	urlsStorage.Store(shortURL, string(output))
 	//заполняем ответ
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
-	_, err := w.Write([]byte(body))
+	_, err = w.Write([]byte(body))
 	if err != nil {
 		log.Println(err.Error())
 	}
@@ -154,6 +159,11 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 	shortURL := randString(8)
 	// сохраняем в мапе
 
+	_, err = url.Parse(req.URL)
+	if err != nil {
+		http.Error(w, "not url", http.StatusBadRequest)
+		return
+	}
 	urlsStorage.Store(shortURL, req.URL)
 
 	//заполняем ответ
