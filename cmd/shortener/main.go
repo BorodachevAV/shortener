@@ -176,18 +176,31 @@ func randString(length int) string {
 }
 
 func shorten(w http.ResponseWriter, r *http.Request) {
-
+	output, _ := io.ReadAll(r.Body)
 	//читаем тело
-	urlFromRequest, _ := io.ReadAll(r.Body)
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		reader := bytes.NewReader(output)
+		gzreader, err := gzip.NewReader(reader)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		output, err = io.ReadAll(gzreader)
+		if err != nil {
+			log.Println(err.Error())
+		}
+	}
+
+	strOutput := string(output)
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-	_, err := url.Parse(string(urlFromRequest))
+	_, err := url.Parse(strOutput)
 	if err != nil {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
-	urlsStorage.Store(shortURL, string(urlFromRequest))
+	log.Println(string(output))
+	urlsStorage.Store(shortURL, string(output))
 	//заполняем ответ
 	if cfg.Cfg.FileStoragePath != "" {
 		file := cfg.Cfg.FileStoragePath
@@ -197,7 +210,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 			var newData ShortenerData
 			newData.ID = data.ID + 1
 			newData.ShortURL = shortURL
-			newData.OriginalURL = string(urlFromRequest)
+			newData.OriginalURL = string(output)
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
@@ -207,7 +220,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 			var newData ShortenerData
 			newData.ID = 1
 			newData.ShortURL = shortURL
-			newData.OriginalURL = string(urlFromRequest)
+			newData.OriginalURL = string(output)
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
