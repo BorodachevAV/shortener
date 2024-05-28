@@ -31,14 +31,14 @@ var (
 	cfg                    = config.New()
 )
 
-type ShortenJsonRequest struct {
-	Url string
+type ShortenJSONRequest struct {
+	URL string
 }
 
 type ShortenerData struct {
 	ID          uint   `json:"uuid"`
-	ShortUrl    string `json:"short_url"`
-	OriginalUrl string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
 
 type StorageWriter struct {
@@ -196,8 +196,8 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		if data != nil {
 			var newData ShortenerData
 			newData.ID = data.ID + 1
-			newData.ShortUrl = shortURL
-			newData.OriginalUrl = string(urlFromRequest)
+			newData.ShortURL = shortURL
+			newData.OriginalURL = string(urlFromRequest)
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
@@ -206,8 +206,8 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		} else {
 			var newData ShortenerData
 			newData.ID = 1
-			newData.ShortUrl = shortURL
-			newData.OriginalUrl = string(urlFromRequest)
+			newData.ShortURL = shortURL
+			newData.OriginalURL = string(urlFromRequest)
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
@@ -227,8 +227,8 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func shortenJson(w http.ResponseWriter, r *http.Request) {
-	var req ShortenJsonRequest
+func shortenJSON(w http.ResponseWriter, r *http.Request) {
+	var req ShortenJSONRequest
 	var buf bytes.Buffer
 	// читаем тело запроса
 
@@ -244,12 +244,12 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 	shortURL := randString(8)
 	// сохраняем в мапе
 
-	_, err = url.Parse(req.Url)
+	_, err = url.Parse(req.URL)
 	if err != nil {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
-	urlsStorage.Store(shortURL, req.Url)
+	urlsStorage.Store(shortURL, req.URL)
 	if cfg.Cfg.FileStoragePath != "" {
 		file := cfg.Cfg.FileStoragePath
 		storageReader, _ := NewStorageReader(file)
@@ -257,8 +257,8 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 		if data != nil {
 			var newData ShortenerData
 			newData.ID = data.ID + 1
-			newData.ShortUrl = shortURL
-			newData.OriginalUrl = req.Url
+			newData.ShortURL = shortURL
+			newData.OriginalURL = req.URL
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
@@ -267,8 +267,8 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 		} else {
 			var newData ShortenerData
 			newData.ID = 1
-			newData.ShortUrl = shortURL
-			newData.OriginalUrl = req.Url
+			newData.ShortURL = shortURL
+			newData.OriginalURL = req.URL
 			storageWriter, _ := NewStorageWriter(file)
 			err = storageWriter.WriteData(&newData)
 			if err != nil {
@@ -322,7 +322,7 @@ func main() {
 	r.Use(withLogging)
 	r.Use(gzipHandle)
 	r.Post(`/`, shorten)
-	r.Post(`/api/shorten`, shortenJson)
+	r.Post(`/api/shorten`, shortenJSON)
 	r.Get(`/{id}`, expand)
 	log.Fatal(http.ListenAndServe(cfg.Cfg.ServerAddress, r))
 }
