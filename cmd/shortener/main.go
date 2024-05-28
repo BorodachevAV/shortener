@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -30,11 +32,79 @@ var (
 )
 
 type ShortenJsonRequest struct {
-	URL string
+	Url string
 }
 
-type ShortenJsonRResponse struct {
-	result string
+type ShortenerData struct {
+	ID          uint   `json:"uuid"`
+	ShortUrl    string `json:"short_url"`
+	OriginalUrl string `json:"original_url"`
+}
+
+type StorageWriter struct {
+	file *os.File
+}
+
+func NewStorageWriter(filename string) (*StorageWriter, error) {
+	// открываем файл для записи в конец
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StorageWriter{file: file}, nil
+}
+
+func (w *StorageWriter) WriteData(event *ShortenerData) error {
+	data, err := json.Marshal(&event)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+
+	_, err = w.file.Write(data)
+	return err
+}
+
+func (w *StorageWriter) Close() error {
+	// закрываем файл
+	return w.file.Close()
+}
+
+type StorageReader struct {
+	file    *os.File
+	scanner *bufio.Scanner
+}
+
+func NewStorageReader(filename string) (*StorageReader, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StorageReader{file: file,
+		scanner: bufio.NewScanner(file),
+	}, nil
+}
+
+func (r *StorageReader) ReadData() (*ShortenerData, error) {
+	if !r.scanner.Scan() {
+		return nil, r.scanner.Err()
+	}
+	data := r.scanner.Bytes()
+
+	storageData := ShortenerData{}
+	err := json.Unmarshal(data, &storageData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &storageData, nil
+}
+
+func (r *StorageReader) Close() error {
+	// закрываем файл
+	return r.file.Close()
 }
 
 type gzipWriter struct {
@@ -43,7 +113,6 @@ type gzipWriter struct {
 }
 
 func (w gzipWriter) Write(b []byte) (int, error) {
-	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
 	return w.Writer.Write(b)
 }
 
@@ -74,27 +143,19 @@ func withLogging(h http.Handler) http.Handler {
 	}
 	defer logger.Sync()
 
-	// делаем регистратор SugaredLogger
 	var sugar = *logger.Sugar()
 
 	logFn := func(w http.ResponseWriter, r *http.Request) {
-		// функция Now() возвращает текущее время
 		start := time.Now()
 
-		// эндпоинт /ping
 		uri := r.RequestURI
-		// метод запроса
+
 		method := r.Method
 
-		// точка, где выполняется хендлер pingHandler
-		h.ServeHTTP(w, r) // обслуживание оригинального запроса
+		h.ServeHTTP(w, r)
 
-		// Since возвращает разницу во времени между start
-		// и моментом вызова Since. Таким образом можно посчитать
-		// время выполнения запроса.
 		duration := time.Since(start)
 
-		// отправляем сведения о запросе в zap
 		sugar.Infoln(
 			"uri", uri,
 			"method", method,
@@ -102,7 +163,6 @@ func withLogging(h http.Handler) http.Handler {
 		)
 
 	}
-	// возвращаем функционально расширенный хендлер
 	return http.HandlerFunc(logFn)
 }
 
@@ -119,19 +179,44 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 
 	//читаем тело
 	urlFromRequest, _ := io.ReadAll(r.Body)
-	reader := bytes.NewReader(urlFromRequest)
-	gzreader, _ := gzip.NewReader(reader)
-	output, _ := io.ReadAll(gzreader)
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-	_, err := url.Parse(string(output))
+	_, err := url.Parse(string(urlFromRequest))
 	if err != nil {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
-	urlsStorage.Store(shortURL, string(output))
+	urlsStorage.Store(shortURL, string(urlFromRequest))
 	//заполняем ответ
+	if cfg.Cfg.FileStoragePath != "" {
+		file := cfg.Cfg.FileStoragePath
+		storageReader, _ := NewStorageReader(file)
+		data, _ := storageReader.ReadData()
+		if data != nil {
+			var newData ShortenerData
+			newData.ID = data.ID + 1
+			newData.ShortUrl = shortURL
+			newData.OriginalUrl = string(urlFromRequest)
+			storageWriter, _ := NewStorageWriter(file)
+			err = storageWriter.WriteData(&newData)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		} else {
+			var newData ShortenerData
+			newData.ID = 1
+			newData.ShortUrl = shortURL
+			newData.OriginalUrl = string(urlFromRequest)
+			storageWriter, _ := NewStorageWriter(file)
+			err = storageWriter.WriteData(&newData)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		}
+
+	}
+
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", cfg.Cfg.ServerAddress)
@@ -159,13 +244,39 @@ func shortenJson(w http.ResponseWriter, r *http.Request) {
 	shortURL := randString(8)
 	// сохраняем в мапе
 
-	_, err = url.Parse(req.URL)
+	_, err = url.Parse(req.Url)
 	if err != nil {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
-	urlsStorage.Store(shortURL, req.URL)
+	urlsStorage.Store(shortURL, req.Url)
+	if cfg.Cfg.FileStoragePath != "" {
+		file := cfg.Cfg.FileStoragePath
+		storageReader, _ := NewStorageReader(file)
+		data, _ := storageReader.ReadData()
+		if data != nil {
+			var newData ShortenerData
+			newData.ID = data.ID + 1
+			newData.ShortUrl = shortURL
+			newData.OriginalUrl = req.Url
+			storageWriter, _ := NewStorageWriter(file)
+			err = storageWriter.WriteData(&newData)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		} else {
+			var newData ShortenerData
+			newData.ID = 1
+			newData.ShortUrl = shortURL
+			newData.OriginalUrl = req.Url
+			storageWriter, _ := NewStorageWriter(file)
+			err = storageWriter.WriteData(&newData)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		}
 
+	}
 	//заполняем ответ
 	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
 	m := make(map[string]string)
@@ -196,12 +307,16 @@ func main() {
 
 	a := flag.String("a", "localhost:8080", "shortener host")
 	b := flag.String("b", "http://localhost:8080", "response host")
+	f := flag.String("f", "", "storage file path")
 	flag.Parse()
 	if cfg.Cfg.ServerAddress == "" {
 		cfg.Cfg.ServerAddress = *a
 	}
 	if cfg.Cfg.BaseURL == "" {
 		cfg.Cfg.BaseURL = *b
+	}
+	if cfg.Cfg.FileStoragePath == "" {
+		cfg.Cfg.FileStoragePath = *f
 	}
 	r := chi.NewRouter()
 	r.Use(withLogging)

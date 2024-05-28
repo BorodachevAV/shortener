@@ -5,8 +5,9 @@ import (
 )
 
 type ShortenerConfig struct {
-	ServerAddress string
-	BaseURL       string
+	ServerAddress   string
+	BaseURL         string
+	FileStoragePath string
 }
 
 type Config struct {
@@ -16,8 +17,9 @@ type Config struct {
 func New() *Config {
 	return &Config{
 		Cfg: ShortenerConfig{
-			ServerAddress: getEnv("SERVER_ADDRESS", ""),
-			BaseURL:       getEnv("BASE_URL", ""),
+			ServerAddress:   getEnv("SERVER_ADDRESS", ""),
+			BaseURL:         getEnv("BASE_URL", ""),
+			FileStoragePath: getEnv("FILE_STORAGE_PATH", ""),
 		},
 	}
 }
