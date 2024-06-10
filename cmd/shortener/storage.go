@@ -29,13 +29,13 @@ func (f MapStorage) WriteURL(data *ShortenerData) error {
 
 func (f MapStorage) ReadURL(URL string) (*ShortenerData, bool) {
 	val, ok := f.urlsStorage.Load(URL)
+	if !ok {
+		return nil, false
+	}
 	resp := ShortenerData{
 		OriginalURL: val.(string),
 	}
-	if !ok {
-		return nil, ok
-	}
-	return &resp, ok
+	return &resp, true
 }
 
 type FileStorage struct {
