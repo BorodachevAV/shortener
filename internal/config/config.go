@@ -8,6 +8,7 @@ type ShortenerConfig struct {
 	ServerAddress   string
 	BaseURL         string
 	FileStoragePath string
+	DataBaseDNS     string
 }
 
 type Config struct {
@@ -20,7 +21,7 @@ func New() *Config {
 			ServerAddress:   getEnv("SERVER_ADDRESS", ""),
 			BaseURL:         getEnv("BASE_URL", ""),
 			FileStoragePath: getEnv("FILE_STORAGE_PATH", ""),
-		},
+			DataBaseDNS:     getEnv("DATABASE_DSN", "")},
 	}
 }
 
