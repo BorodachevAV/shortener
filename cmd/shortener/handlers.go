@@ -56,13 +56,12 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	WriteData(mapStorage, &sd)
 
 	//заполняем ответ
-	if cfg.Cfg.FileStoragePath != "" {
-		file := cfg.Cfg.FileStoragePath
+	log.Println(conf.Cfg.FileStoragePath)
+	if conf.Cfg.FileStoragePath != "" {
+		file := conf.Cfg.FileStoragePath
 		fileStorage, _ := NewFileStorage(file)
 		data, _ := ReadData(fileStorage, shortURL)
 
-		//storageReader, _ := NewStorageReader(file)
-		//data, _ := storageReader.ReadData()
 		if data != nil {
 			var newData ShortenerData
 			newData.ID = data.ID + 1
@@ -86,9 +85,9 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
+	body := fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL)
 	w.Header().Add("Content-Type", "text/plain")
-	w.Header().Add("Host", cfg.Cfg.ServerAddress)
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(body))
 	if err != nil {
@@ -125,9 +124,8 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteData(mapStorage, &sd)
-
-	if cfg.Cfg.FileStoragePath != "" {
-		file := cfg.Cfg.FileStoragePath
+	if conf.Cfg.FileStoragePath != "" {
+		file := conf.Cfg.FileStoragePath
 		fileStorage, _ := NewFileStorage(file)
 		data, _ := ReadData(fileStorage, shortURL)
 		if data != nil {
@@ -152,12 +150,12 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	}
 	//заполняем ответ
-	body := fmt.Sprintf("%s/%s", cfg.Cfg.BaseURL, shortURL)
+	body := fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL)
 	m := make(map[string]string)
 	m["result"] = body
 	respBody, _ := json.Marshal(m)
 	w.Header().Add("Content-Type", "application/json")
-	w.Header().Add("Host", cfg.Cfg.ServerAddress)
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write(respBody)
 	if err != nil {
@@ -179,7 +177,7 @@ func expand(w http.ResponseWriter, r *http.Request) {
 }
 
 func pingDB(w http.ResponseWriter, r *http.Request) {
-	pg, err := pgConnect(cfg.Cfg.DataBaseDNS)
+	pg, err := pgConnect(conf.Cfg.DataBaseDNS)
 	err = pg.Ping()
 	if err != nil {
 		http.Error(w, "wrong conn string", http.StatusInternalServerError)

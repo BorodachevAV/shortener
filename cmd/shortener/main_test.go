@@ -13,7 +13,7 @@ import (
 
 func TestShortener(t *testing.T) {
 	t.Run("Get 404", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		request := httptest.NewRequest(http.MethodGet, "/123", nil)
 		w := httptest.NewRecorder()
 		expand(w, request)
 

@@ -22,7 +22,7 @@ const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 var (
 	mapStorage = MapStorage{urlsStorage: &sync.Map{}}
 	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	cfg        = config.New()
+	conf       = config.NewConfig()
 )
 
 type gzipWriter struct {
@@ -102,17 +102,17 @@ func main() {
 
 	flag.Parse()
 
-	if cfg.Cfg.ServerAddress == "" {
-		cfg.Cfg.ServerAddress = *a
+	if conf.Cfg.ServerAddress == "" {
+		conf.Cfg.ServerAddress = *a
 	}
-	if cfg.Cfg.BaseURL == "" {
-		cfg.Cfg.BaseURL = *b
+	if conf.Cfg.BaseURL == "" {
+		conf.Cfg.BaseURL = *b
 	}
-	if cfg.Cfg.FileStoragePath == "" {
-		cfg.Cfg.FileStoragePath = *f
+	if conf.Cfg.FileStoragePath == "" {
+		conf.Cfg.FileStoragePath = *f
 	}
-	if cfg.Cfg.DataBaseDNS == "" {
-		cfg.Cfg.FileStoragePath = *d
+	if conf.Cfg.DataBaseDNS == "" {
+		conf.Cfg.DataBaseDNS = *d
 	}
 
 	r := chi.NewRouter()
@@ -122,5 +122,5 @@ func main() {
 	r.Post(`/api/shorten`, shortenJSON)
 	r.Get(`/{id}`, expand)
 	r.Get(`/ping`, pingDB)
-	log.Fatal(http.ListenAndServe(cfg.Cfg.ServerAddress, r))
+	log.Fatal(http.ListenAndServe(conf.Cfg.ServerAddress, r))
 }
