@@ -55,6 +55,15 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    shortURL,
 		OriginalURL: string(output),
 	}
+	if conf.Cfg.DataBaseDNS != "" {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		WriteData(db, &sd)
+	}
 	WriteData(mapStorage, &sd)
 
 	//заполняем ответ
