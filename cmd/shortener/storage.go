@@ -138,8 +138,7 @@ func (db DBStorage) WriteURL(sd *ShortenerData) error {
 		return err
 	}
 	_, err = tx.ExecContext(context.Background(),
-		"INSERT INTO url_storage (short_url, original_url)"+
-			" VALUES(?,?)", sd.ShortURL, sd.OriginalURL)
+		"INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
 	if err != nil {
 		// если ошибка, то откатываем изменения
 		tx.Rollback()
