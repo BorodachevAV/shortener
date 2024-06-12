@@ -37,8 +37,8 @@ func ReadData(ss ShortenerStorage, s string) (*ShortenerData, bool) {
 }
 
 func WriteBatchData(ss ShortenerStorage, sd []*ShortenerData) error {
-	for _, sd := range sd {
-		err := ss.WriteURL(sd)
+	for _, data := range sd {
+		err := ss.WriteURL(data)
 		if err != nil {
 			return err
 		}
