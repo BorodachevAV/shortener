@@ -115,7 +115,9 @@ func main() {
 	if conf.Cfg.DataBaseDNS == "" {
 		conf.Cfg.DataBaseDNS = *d
 	}
+	log.Println(conf.Cfg.DataBaseDNS)
 	if conf.Cfg.DataBaseDNS != "" {
+		log.Println("here")
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)

@@ -149,21 +149,17 @@ func (db DBStorage) WriteURL(sd *ShortenerData) error {
 }
 
 func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
-	row := db.db.QueryRowContext(context.Background(),
-		"SELECT original_url FROM url_storage where short_url = $1", URL)
+	var orig_url string
+	db.db.QueryRowContext(db.ctx,
+		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&orig_url)
 	// готовим переменную для чтения результата
-	var originalURL string
-	err := row.Scan(&originalURL) // разбираем результат
-	if err != nil {
-		panic(err)
-	}
-	if originalURL == "" {
-		return nil, false
-	} else {
+
+	if URL != "" {
 		return &ShortenerData{
-			ShortURL:    URL,
-			OriginalURL: originalURL,
+			OriginalURL: URL,
 		}, true
+	} else {
+		return nil, false
 	}
 
 }

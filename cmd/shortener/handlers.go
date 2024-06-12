@@ -129,6 +129,8 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 func shortenBatch(w http.ResponseWriter, r *http.Request) {
 	var batch []ShortenBatchRequest
 	var buf bytes.Buffer
+	var sdBatch []*ShortenerData
+	var Response []ShortenBatchResponse
 	// читаем тело запроса
 
 	_, err := buf.ReadFrom(r.Body)
@@ -138,8 +140,7 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.Unmarshal(buf.Bytes(), &batch)
-	sdBatch := []*ShortenerData{}
-	Response := []ShortenBatchResponse{}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 	db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
