@@ -2,7 +2,13 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"log"
 	"os"
 	"sync"
 )
@@ -80,43 +86,85 @@ func (f FileStorage) ReadURL(shortURL string) (*ShortenerData, bool) {
 	return &storageData, false
 }
 
-func (f FileStorage) Delete() error {
-	// закрываем файл
-	return f.file.Close()
+type DBStorage struct {
+	db  *sql.DB
+	ctx context.Context
 }
 
-type StorageReader struct {
-	file    *os.File
-	scanner *bufio.Scanner
-}
-
-func NewStorageReader(filename string) (*StorageReader, error) {
-	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+func NewDBStorage(DNS string, ctx context.Context) (*DBStorage, error) {
+	db, err := sql.Open("pgx", DNS)
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
 	}
-
-	return &StorageReader{file: file,
-		scanner: bufio.NewScanner(file),
+	return &DBStorage{
+		db:  db,
+		ctx: ctx,
 	}, nil
 }
 
-func (r *StorageReader) ReadData() (*ShortenerData, bool) {
-	if !r.scanner.Scan() {
-		return nil, false
-	}
-	data := r.scanner.Bytes()
+func (db DBStorage) createSchema() error {
 
-	storageData := ShortenerData{}
-	err := json.Unmarshal(data, &storageData)
+	tx, err := db.db.BeginTx(db.ctx, nil)
 	if err != nil {
-		return nil, false
+		return fmt.Errorf("failed to start a transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			if !errors.Is(err, sql.ErrTxDone) {
+				log.Printf("failed to rollback the transaction: %v", err)
+			}
+		}
+	}()
+
+	createShema :=
+		`CREATE TABLE IF NOT EXISTS url_storage(
+			short_url VARCHAR(200) PRIMARY KEY,
+			original_url VARCHAR(200) NOT NULL
+		)`
+
+	if _, err := tx.ExecContext(db.ctx, createShema); err != nil {
+		return fmt.Errorf("failed to execute statement `%s`: %w", createShema, err)
 	}
 
-	return &storageData, true
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit the transaction: %w", err)
+	}
+	return nil
 }
 
-func (r *StorageReader) Close() error {
-	// закрываем файл
-	return r.file.Close()
+func (db DBStorage) WriteURL(sd *ShortenerData) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(context.Background(),
+		"INSERT INTO url_storage (short_url, original_url)"+
+			" VALUES(?,?)", sd.ShortURL, sd.OriginalURL)
+	if err != nil {
+		// если ошибка, то откатываем изменения
+		tx.Rollback()
+		return err
+	}
+	// завершаем транзакцию
+	return tx.Commit()
+}
+
+func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
+	row := db.db.QueryRowContext(context.Background(),
+		"SELECT original_url FROM url_storage where short_url = $1", URL)
+	// готовим переменную для чтения результата
+	var originalURL string
+	err := row.Scan(&originalURL) // разбираем результат
+	if err != nil {
+		panic(err)
+	}
+	if originalURL == "" {
+		return nil, false
+	} else {
+		return &ShortenerData{
+			ShortURL:    URL,
+			OriginalURL: originalURL,
+		}, true
+	}
+
 }

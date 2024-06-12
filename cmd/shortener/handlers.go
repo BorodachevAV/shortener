@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type ShortenJSONRequest struct {
@@ -122,7 +124,15 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    shortURL,
 		OriginalURL: req.URL,
 	}
-
+	if conf.Cfg.DataBaseDNS != "" {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		WriteData(db, &sd)
+	}
 	WriteData(mapStorage, &sd)
 	if conf.Cfg.FileStoragePath != "" {
 		file := conf.Cfg.FileStoragePath
@@ -165,20 +175,38 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 func expand(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "id")
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
-	val, ok := ReadData(mapStorage, shortURL)
-
-	if ok {
-		w.Header().Add("Location", val.OriginalURL)
-		w.WriteHeader(http.StatusTemporaryRedirect)
+	if conf.Cfg.DataBaseDNS != "" {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		val, ok := ReadData(db, shortURL)
+		if ok {
+			w.Header().Add("Location", val.OriginalURL)
+			w.WriteHeader(http.StatusTemporaryRedirect)
+		} else {
+			http.Error(w, "short url not found", http.StatusNotFound)
+			return
+		}
 	} else {
-		http.Error(w, "short url not found", http.StatusNotFound)
-		return
+		val, ok := ReadData(mapStorage, shortURL)
+
+		if ok {
+			w.Header().Add("Location", val.OriginalURL)
+			w.WriteHeader(http.StatusTemporaryRedirect)
+		} else {
+			http.Error(w, "short url not found", http.StatusNotFound)
+			return
+		}
 	}
+
 }
 
 func pingDB(w http.ResponseWriter, r *http.Request) {
-	pg, err := pgConnect(conf.Cfg.DataBaseDNS)
-	err = pg.Ping()
+	pg, _ := pgConnect(conf.Cfg.DataBaseDNS)
+	err := pg.Ping()
 	if err != nil {
 		http.Error(w, "wrong conn string", http.StatusInternalServerError)
 		return
