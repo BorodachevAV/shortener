@@ -131,6 +131,7 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err.Error())
 		}
+		db.createSchema()
 		WriteData(db, &sd)
 	}
 	WriteData(mapStorage, &sd)
