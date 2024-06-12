@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"context"
 	"flag"
 	"github.com/BorodachevAV/shortener/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -114,7 +115,15 @@ func main() {
 	if conf.Cfg.DataBaseDNS == "" {
 		conf.Cfg.DataBaseDNS = *d
 	}
-
+	if conf.Cfg.DataBaseDNS != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		db.createSchema()
+	}
 	r := chi.NewRouter()
 	r.Use(withLogging)
 	r.Use(gzipHandle)
