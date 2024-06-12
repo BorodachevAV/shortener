@@ -19,13 +19,13 @@ type ShortenJSONRequest struct {
 }
 
 type ShortenBatchRequest struct {
-	correlation_id string
-	original_url   string
+	Correlation_id string `json:"correlation_id"`
+	Original_url   string `json:"original_url"`
 }
 
 type ShortenBatchResponse struct {
-	correlation_id string
-	short_url      string
+	Correlation_id string `json:"correlation_id"`
+	Short_url      string `json:"short_url"`
 }
 
 func WriteData(ss ShortenerStorage, sd *ShortenerData) error {
@@ -150,11 +150,11 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 		shortURL := randString(8)
 		sdBatch = append(sdBatch, &ShortenerData{
 			ShortURL:    shortURL,
-			OriginalURL: URL.original_url,
+			OriginalURL: URL.Original_url,
 		})
 		Response = append(Response, ShortenBatchResponse{
-			correlation_id: URL.correlation_id,
-			short_url:      shortURL,
+			Correlation_id: URL.Correlation_id,
+			Short_url:      shortURL,
 		})
 	}
 	WriteBatchData(db, sdBatch)
