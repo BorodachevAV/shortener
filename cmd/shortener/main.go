@@ -129,7 +129,9 @@ func main() {
 	r.Use(gzipHandle)
 	r.Post(`/`, shorten)
 	r.Post(`/api/shorten`, shortenJSON)
+	r.Post(`/api/shorten/batch`, shortenBatch)
 	r.Get(`/{id}`, expand)
 	r.Get(`/ping`, pingDB)
+
 	log.Fatal(http.ListenAndServe(conf.Cfg.ServerAddress, r))
 }

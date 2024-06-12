@@ -18,12 +18,32 @@ type ShortenJSONRequest struct {
 	URL string
 }
 
+type ShortenBatchRequest struct {
+	correlation_id string
+	original_url   string
+}
+
+type ShortenBatchResponse struct {
+	correlation_id string
+	short_url      string
+}
+
 func WriteData(ss ShortenerStorage, sd *ShortenerData) error {
 	return ss.WriteURL(sd)
 }
 
 func ReadData(ss ShortenerStorage, s string) (*ShortenerData, bool) {
 	return ss.ReadURL(s)
+}
+
+func WriteBatchData(ss ShortenerStorage, sd []*ShortenerData) error {
+	for _, sd := range sd {
+		err := ss.WriteURL(sd)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func shorten(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +124,50 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err.Error())
 	}
+}
+
+func shortenBatch(w http.ResponseWriter, r *http.Request) {
+	var batch []ShortenBatchRequest
+	var buf bytes.Buffer
+	// читаем тело запроса
+
+	_, err := buf.ReadFrom(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	json.Unmarshal(buf.Bytes(), &batch)
+	sdBatch := []*ShortenerData{}
+	Response := []ShortenBatchResponse{}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	for _, URL := range batch {
+		shortURL := randString(8)
+		sdBatch = append(sdBatch, &ShortenerData{
+			ShortURL:    shortURL,
+			OriginalURL: URL.original_url,
+		})
+		Response = append(Response, ShortenBatchResponse{
+			correlation_id: URL.correlation_id,
+			short_url:      shortURL,
+		})
+	}
+	WriteBatchData(db, sdBatch)
+
+	respBody, _ := json.Marshal(Response)
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write(respBody)
+	if err != nil {
+		log.Println(err.Error())
+	}
+
 }
 
 func shortenJSON(w http.ResponseWriter, r *http.Request) {
