@@ -150,13 +150,13 @@ func (db DBStorage) WriteURL(sd *ShortenerData) error {
 
 func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
 	var orig_url string
-	db.db.QueryRowContext(db.ctx,
+	db.db.QueryRow(
 		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&orig_url)
 	// готовим переменную для чтения результата
 
 	if URL != "" {
 		return &ShortenerData{
-			OriginalURL: URL,
+			OriginalURL: orig_url,
 		}, true
 	} else {
 		return nil, false

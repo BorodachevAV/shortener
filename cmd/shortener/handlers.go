@@ -250,8 +250,7 @@ func expand(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "id")
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
 	if conf.Cfg.DataBaseDNS != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-		defer cancel()
+		ctx := context.Background()
 		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
 		if err != nil {
 			log.Println(err.Error())
