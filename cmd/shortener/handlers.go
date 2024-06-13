@@ -51,6 +51,8 @@ func WriteBatchData(ss storage.ShortenerStorage, sd []*storage.ShortenerData) er
 }
 
 func shorten(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain")
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	output, _ := io.ReadAll(r.Body)
 	//читаем тело
 	if r.Header.Get("Content-Encoding") == "gzip" {
@@ -130,8 +132,6 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := sd.ShortURL
-	w.Header().Add("Content-Type", "text/plain")
-	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	_, err = w.Write([]byte(body))
 	if err != nil {
 		log.Println(err.Error())
@@ -186,6 +186,9 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 func shortenJSON(w http.ResponseWriter, r *http.Request) {
 	var req ShortenJSONRequest
 	var buf bytes.Buffer
+
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	// читаем тело запроса
 
 	_, err := buf.ReadFrom(r.Body)
@@ -263,9 +266,6 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 	m := make(map[string]string)
 	m["result"] = body
 	respBody, _ := json.Marshal(m)
-	w.Header().Add("Content-Type", "application/json")
-	w.Header().Add("Host", conf.Cfg.ServerAddress)
-	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write(respBody)
 	if err != nil {
 		log.Println(err.Error())
