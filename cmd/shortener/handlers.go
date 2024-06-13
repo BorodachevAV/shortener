@@ -120,7 +120,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
-
+		WriteData(mapStorage, sd)
 	} else {
 		WriteData(mapStorage, sd)
 	}
@@ -227,10 +227,7 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
-	}
-
-	WriteData(mapStorage, sd)
-	if conf.Cfg.FileStoragePath != "" {
+	} else if conf.Cfg.FileStoragePath != "" {
 		file := conf.Cfg.FileStoragePath
 		fileStorage, _ := storage.NewFileStorage(file)
 		data, _ := ReadData(fileStorage, shortURL)
@@ -247,8 +244,11 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
-
+		WriteData(mapStorage, sd)
+	} else {
+		WriteData(mapStorage, sd)
 	}
+
 	//заполняем ответ
 	body := sd.ShortURL
 	m := make(map[string]string)
