@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"github.com/BorodachevAV/shortener/internal/config"
+	"github.com/BorodachevAV/shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"io"
@@ -21,7 +22,7 @@ const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 // генерим сид
 var (
-	mapStorage = MapStorage{urlsStorage: &sync.Map{}}
+	mapStorage = storage.MapStorage{UrlsStorage: &sync.Map{}}
 	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	conf       = config.NewConfig()
 )
@@ -118,11 +119,11 @@ func main() {
 	if conf.Cfg.DataBaseDNS != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		db, err := NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
 		if err != nil {
 			log.Println(err.Error())
 		}
-		db.createSchema()
+		db.CreateSchema()
 	}
 	r := chi.NewRouter()
 	r.Use(withLogging)

@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"bufio"
@@ -25,16 +25,16 @@ type ShortenerStorage interface {
 }
 
 type MapStorage struct {
-	urlsStorage *sync.Map
+	UrlsStorage *sync.Map
 }
 
 func (f MapStorage) WriteURL(data *ShortenerData) error {
-	f.urlsStorage.Store(data.ShortURL, data.OriginalURL)
+	f.UrlsStorage.Store(data.ShortURL, data.OriginalURL)
 	return nil
 }
 
 func (f MapStorage) ReadURL(URL string) (*ShortenerData, bool) {
-	val, ok := f.urlsStorage.Load(URL)
+	val, ok := f.UrlsStorage.Load(URL)
 	if !ok {
 		return nil, false
 	}
@@ -102,7 +102,7 @@ func NewDBStorage(DNS string, ctx context.Context) (*DBStorage, error) {
 	}, nil
 }
 
-func (db DBStorage) createSchema() error {
+func (db DBStorage) CreateSchema() error {
 
 	tx, err := db.db.BeginTx(db.ctx, nil)
 	if err != nil {
@@ -119,7 +119,7 @@ func (db DBStorage) createSchema() error {
 	createShema :=
 		`CREATE TABLE IF NOT EXISTS url_storage(
 			short_url VARCHAR(200) PRIMARY KEY,
-			original_url VARCHAR(200) NOT NULL
+			original_url VARCHAR(200) NOT NULL UNIQUE
 		)`
 
 	if _, err := tx.ExecContext(db.ctx, createShema); err != nil {
@@ -151,7 +151,7 @@ func (db DBStorage) WriteURL(sd *ShortenerData) error {
 func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
 	var origURL string
 	db.db.QueryRow(
-		"SELECT original_url FROM url_storage where short_url =$1", fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, URL)).Scan(&origURL)
+		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&origURL)
 	// готовим переменную для чтения результата
 	if origURL != "" {
 		log.Println("orig_url not null")
@@ -163,4 +163,18 @@ func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
 		return nil, false
 	}
 
+}
+
+func (db DBStorage) GetShortURLByOriginal(URL string) (*ShortenerData, bool) {
+	var shortURL string
+	db.db.QueryRow(
+		"SELECT short_url FROM url_storage where original_url =$1", URL).Scan(&shortURL)
+	// готовим переменную для чтения результата
+	if shortURL != "" {
+		return &ShortenerData{
+			ShortURL: shortURL,
+		}, true
+	} else {
+		return nil, false
+	}
 }
