@@ -150,12 +150,12 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 	for _, URL := range batch {
 		shortURL := randString(8)
 		sdBatch = append(sdBatch, &ShortenerData{
-			ShortURL:    shortURL,
+			ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 			OriginalURL: URL.Original_url,
 		})
 		Response = append(Response, ShortenBatchResponse{
 			Correlation_id: URL.Correlation_id,
-			Short_url:      shortURL,
+			Short_url:      fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		})
 	}
 	WriteBatchData(db, sdBatch)
