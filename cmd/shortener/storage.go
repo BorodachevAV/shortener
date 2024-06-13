@@ -149,15 +149,15 @@ func (db DBStorage) WriteURL(sd *ShortenerData) error {
 }
 
 func (db DBStorage) ReadURL(URL string) (*ShortenerData, bool) {
-	var orig_url string
+	var origURL string
 	db.db.QueryRow(
-		"SELECT original_url FROM url_storage where short_url =$1", fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, URL)).Scan(&orig_url)
+		"SELECT original_url FROM url_storage where short_url =$1", fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, URL)).Scan(&origURL)
 	// готовим переменную для чтения результата
-	if orig_url != "" {
+	if origURL != "" {
 		log.Println("orig_url not null")
-		log.Println(orig_url)
+		log.Println(origURL)
 		return &ShortenerData{
-			OriginalURL: orig_url,
+			OriginalURL: origURL,
 		}, true
 	} else {
 		return nil, false
