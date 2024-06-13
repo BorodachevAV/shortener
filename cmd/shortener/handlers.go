@@ -19,12 +19,12 @@ type ShortenJSONRequest struct {
 }
 
 type ShortenBatchRequest struct {
-	CorrelationId string `json:"correlation_id"`
+	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
 type ShortenBatchResponse struct {
-	CorrelationId string `json:"correlation_id"`
+	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
 
@@ -154,7 +154,7 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 			OriginalURL: URL.OriginalURL,
 		})
 		Response = append(Response, ShortenBatchResponse{
-			CorrelationId: URL.CorrelationId,
+			CorrelationID: URL.CorrelationID,
 			ShortURL:      fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		})
 	}
