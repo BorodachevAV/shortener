@@ -74,7 +74,6 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
-	log.Println(string(output))
 	sd := &storage.ShortenerData{
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: string(output),
@@ -87,10 +86,12 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 			log.Println(err.Error())
 		}
 		err = WriteData(db, sd)
+		w.WriteHeader(http.StatusCreated)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 				sd, _ = db.GetShortURLByOriginal(sd.OriginalURL)
+				w.WriteHeader(http.StatusConflict)
 			} else {
 				log.Println(err.Error())
 			}
@@ -120,15 +121,17 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
+
 		WriteData(mapStorage, sd)
+		w.WriteHeader(http.StatusCreated)
 	} else {
 		WriteData(mapStorage, sd)
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	body := sd.ShortURL
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
-	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(body))
 	if err != nil {
 		log.Println(err.Error())
@@ -219,10 +222,12 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 			log.Println(err.Error())
 		}
 		err = WriteData(db, sd)
+		w.WriteHeader(http.StatusCreated)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 				sd, _ = db.GetShortURLByOriginal(sd.OriginalURL)
+				w.WriteHeader(http.StatusConflict)
 			} else {
 				log.Println(err.Error())
 			}
@@ -234,19 +239,23 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 		if data != nil {
 			sd.ID = data.ID + 1
 			err = WriteData(fileStorage, sd)
+			w.WriteHeader(http.StatusCreated)
 			if err != nil {
 				log.Println(err.Error())
 			}
 		} else {
 			sd.ID = 1
 			err = WriteData(fileStorage, sd)
+			w.WriteHeader(http.StatusCreated)
 			if err != nil {
 				log.Println(err.Error())
 			}
 		}
 		WriteData(mapStorage, sd)
+		w.WriteHeader(http.StatusCreated)
 	} else {
 		WriteData(mapStorage, sd)
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	//заполняем ответ
