@@ -88,7 +88,6 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 			log.Println(err.Error())
 		}
 		err = WriteData(db, sd)
-		w.WriteHeader(http.StatusCreated)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -98,6 +97,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
+		w.WriteHeader(http.StatusCreated)
 	} else if conf.Cfg.FileStoragePath != "" {
 		file := conf.Cfg.FileStoragePath
 		fileStorage, _ := storage.NewFileStorage(file)
@@ -225,7 +225,6 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 			log.Println(err.Error())
 		}
 		err = WriteData(db, sd)
-		w.WriteHeader(http.StatusCreated)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -235,6 +234,7 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 				log.Println(err.Error())
 			}
 		}
+		w.WriteHeader(http.StatusCreated)
 	} else if conf.Cfg.FileStoragePath != "" {
 		file := conf.Cfg.FileStoragePath
 		fileStorage, _ := storage.NewFileStorage(file)
