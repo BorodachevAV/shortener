@@ -15,15 +15,10 @@ type FileStorage struct {
 }
 
 func NewFileStorage(filename string) (*FileStorage, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return nil, err
-	}
 
 	return &FileStorage{
 		filename: filename,
-		file:     file,
-		scanner:  bufio.NewScanner(file)}, nil
+	}, nil
 }
 
 func (f FileStorage) WriteURL(sd *storage.ShortenerData) error {
