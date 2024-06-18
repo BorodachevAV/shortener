@@ -168,6 +168,9 @@ func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, storage.ErrDuplicate) {
 		w.WriteHeader(http.StatusConflict)
 		sd.ShortURL, err = sh.storage.CheckDuplicateURL(sd.OriginalURL)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	}
 	w.WriteHeader(http.StatusCreated)
 	//заполняем ответ
