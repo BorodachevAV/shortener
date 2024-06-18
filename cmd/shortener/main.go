@@ -5,7 +5,7 @@ import (
 	"context"
 	"flag"
 	"github.com/BorodachevAV/shortener/internal/config"
-	"github.com/BorodachevAV/shortener/internal/storage/dataBase"
+	"github.com/BorodachevAV/shortener/internal/storage/database"
 	"github.com/BorodachevAV/shortener/internal/storage/file"
 	"github.com/BorodachevAV/shortener/internal/storage/memory"
 	"github.com/go-chi/chi/v5"
@@ -121,7 +121,7 @@ func main() {
 	if conf.Cfg.DataBaseDNS != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		storage, err := dataBase.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		storage, err := database.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
 		if err != nil {
 			log.Println(err.Error())
 		}
