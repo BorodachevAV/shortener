@@ -5,7 +5,9 @@ import (
 	"context"
 	"flag"
 	"github.com/BorodachevAV/shortener/internal/config"
-	"github.com/BorodachevAV/shortener/internal/storage"
+	"github.com/BorodachevAV/shortener/internal/storage/data_base"
+	"github.com/BorodachevAV/shortener/internal/storage/file"
+	"github.com/BorodachevAV/shortener/internal/storage/memory"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"io"
@@ -22,7 +24,6 @@ const Charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 // генерим сид
 var (
-	mapStorage = storage.MapStorage{UrlsStorage: &sync.Map{}}
 	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	conf       = config.NewConfig()
 )
@@ -116,22 +117,35 @@ func main() {
 	if conf.Cfg.DataBaseDNS == "" {
 		conf.Cfg.DataBaseDNS = *d
 	}
+	sh := ShortenerHandler{}
 	if conf.Cfg.DataBaseDNS != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+		storage, err := data_base.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
 		if err != nil {
 			log.Println(err.Error())
 		}
-		db.CreateSchema()
+		sh.storage = storage
+	} else if conf.Cfg.FileStoragePath != "" {
+		storage, err := file.NewFileStorage(conf.Cfg.FileStoragePath)
+		if err != nil {
+			log.Println(err.Error())
+		}
+		sh.storage = storage
+	} else {
+		storage := memory.MapStorage{
+			&sync.Map{},
+		}
+		sh.storage = storage
 	}
+
 	r := chi.NewRouter()
 	r.Use(withLogging)
 	r.Use(gzipHandle)
-	r.Post(`/`, shorten)
-	r.Post(`/api/shorten`, shortenJSON)
-	r.Post(`/api/shorten/batch`, shortenBatch)
-	r.Get(`/{id}`, expand)
+	r.Post(`/`, sh.shorten)
+	r.Post(`/api/shorten`, sh.shortenJSON)
+	r.Post(`/api/shorten/batch`, sh.shortenBatch)
+	r.Get(`/{id}`, sh.expand)
 	r.Get(`/ping`, pingDB)
 
 	log.Fatal(http.ListenAndServe(conf.Cfg.ServerAddress, r))

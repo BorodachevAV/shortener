@@ -3,20 +3,20 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/BorodachevAV/shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 )
+
+type ShortenerHandler struct {
+	storage storage.ShortenerStorage
+}
 
 type ShortenJSONRequest struct {
 	URL string
@@ -36,21 +36,15 @@ func WriteData(ss storage.ShortenerStorage, sd *storage.ShortenerData) error {
 	return ss.WriteURL(sd)
 }
 
-func ReadData(ss storage.ShortenerStorage, s string) (*storage.ShortenerData, bool) {
+func ReadData(ss storage.ShortenerStorage, s string) (*storage.ShortenerData, error) {
 	return ss.ReadURL(s)
 }
 
 func WriteBatchData(ss storage.ShortenerStorage, sd []*storage.ShortenerData) error {
-	for _, data := range sd {
-		err := ss.WriteURL(data)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return ss.WriteBatch(sd)
 }
 
-func shorten(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) shorten(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
 	output, _ := io.ReadAll(r.Body)
@@ -80,57 +74,17 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: string(output),
 	}
-	if conf.Cfg.DataBaseDNS != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-		defer cancel()
-		db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
+	err = WriteData(sh.storage, sd)
+	if errors.Is(err, storage.ErrDuplicate) {
+		w.WriteHeader(http.StatusConflict)
+		body, _ := sh.storage.CheckDuplicateURL(sd.OriginalURL)
+		_, err = w.Write([]byte(body))
 		if err != nil {
 			log.Println(err.Error())
 		}
-		err = WriteData(db, sd)
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-				sd, _ = db.GetShortURLByOriginal(sd.OriginalURL)
-				w.WriteHeader(http.StatusConflict)
-			} else {
-				log.Println(err.Error())
-			}
-		}
-		w.WriteHeader(http.StatusCreated)
-	} else if conf.Cfg.FileStoragePath != "" {
-		file := conf.Cfg.FileStoragePath
-		fileStorage, _ := storage.NewFileStorage(file)
-		data, _ := ReadData(fileStorage, shortURL)
-
-		if data != nil {
-			var newData storage.ShortenerData
-			newData.ID = data.ID + 1
-			newData.ShortURL = shortURL
-			newData.OriginalURL = string(output)
-
-			err = WriteData(fileStorage, &newData)
-			if err != nil {
-				log.Println(err.Error())
-			}
-		} else {
-			var newData storage.ShortenerData
-			newData.ID = 1
-			newData.ShortURL = shortURL
-			newData.OriginalURL = string(output)
-			err = WriteData(fileStorage, &newData)
-			if err != nil {
-				log.Println(err.Error())
-			}
-		}
-
-		WriteData(mapStorage, sd)
-		w.WriteHeader(http.StatusCreated)
-	} else {
-		WriteData(mapStorage, sd)
-		w.WriteHeader(http.StatusCreated)
+		return
 	}
-
+	w.WriteHeader(http.StatusCreated)
 	body := sd.ShortURL
 	_, err = w.Write([]byte(body))
 	if err != nil {
@@ -138,7 +92,7 @@ func shorten(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func shortenBatch(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) shortenBatch(w http.ResponseWriter, r *http.Request) {
 	var batch []ShortenBatchRequest
 	var buf bytes.Buffer
 	var sdBatch []*storage.ShortenerData
@@ -152,13 +106,6 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.Unmarshal(buf.Bytes(), &batch)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-	db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
-	if err != nil {
-		log.Println(err.Error())
-	}
 	for _, URL := range batch {
 		shortURL := randString(8)
 		sdBatch = append(sdBatch, &storage.ShortenerData{
@@ -170,7 +117,7 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 			ShortURL:      fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		})
 	}
-	WriteBatchData(db, sdBatch)
+	WriteBatchData(sh.storage, sdBatch)
 
 	respBody, _ := json.Marshal(Response)
 	w.Header().Add("Content-Type", "application/json")
@@ -183,7 +130,7 @@ func shortenBatch(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func shortenJSON(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 	var req ShortenJSONRequest
 	var buf bytes.Buffer
 
@@ -217,50 +164,12 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: req.URL,
 	}
-	if conf.Cfg.DataBaseDNS != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-		defer cancel()
-		db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
-		if err != nil {
-			log.Println(err.Error())
-		}
-		err = WriteData(db, sd)
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-				sd, _ = db.GetShortURLByOriginal(sd.OriginalURL)
-				w.WriteHeader(http.StatusConflict)
-			} else {
-				log.Println(err.Error())
-			}
-		}
-		w.WriteHeader(http.StatusCreated)
-	} else if conf.Cfg.FileStoragePath != "" {
-		file := conf.Cfg.FileStoragePath
-		fileStorage, _ := storage.NewFileStorage(file)
-		data, _ := ReadData(fileStorage, shortURL)
-		if data != nil {
-			sd.ID = data.ID + 1
-			err = WriteData(fileStorage, sd)
-			w.WriteHeader(http.StatusCreated)
-			if err != nil {
-				log.Println(err.Error())
-			}
-		} else {
-			sd.ID = 1
-			err = WriteData(fileStorage, sd)
-			w.WriteHeader(http.StatusCreated)
-			if err != nil {
-				log.Println(err.Error())
-			}
-		}
-		WriteData(mapStorage, sd)
-		w.WriteHeader(http.StatusCreated)
-	} else {
-		WriteData(mapStorage, sd)
-		w.WriteHeader(http.StatusCreated)
+	err = WriteData(sh.storage, sd)
+	if errors.Is(err, storage.ErrDuplicate) {
+		w.WriteHeader(http.StatusConflict)
+		sd.ShortURL, err = sh.storage.CheckDuplicateURL(sd.OriginalURL)
 	}
-
+	w.WriteHeader(http.StatusCreated)
 	//заполняем ответ
 	body := sd.ShortURL
 	m := make(map[string]string)
@@ -272,33 +181,19 @@ func shortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func expand(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) expand(w http.ResponseWriter, r *http.Request) {
 	shortURL := fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, chi.URLParam(r, "id"))
 	//проверяем в мапе наличие ключа, отдаем 404 если его нет
-	if conf.Cfg.DataBaseDNS != "" {
-		ctx := context.Background()
-		db, err := storage.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
-		if err != nil {
-			log.Println(err.Error())
-		}
-		val, ok := ReadData(db, shortURL)
-		if ok {
-			w.Header().Add("Location", val.OriginalURL)
-			w.WriteHeader(http.StatusTemporaryRedirect)
-		} else {
-			http.Error(w, "short url not found", http.StatusNotFound)
-			return
-		}
+	val, err := ReadData(sh.storage, shortURL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	if val != nil {
+		w.Header().Add("Location", val.OriginalURL)
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {
-		val, ok := ReadData(mapStorage, shortURL)
-
-		if ok {
-			w.Header().Add("Location", val.OriginalURL)
-			w.WriteHeader(http.StatusTemporaryRedirect)
-		} else {
-			http.Error(w, "short url not found", http.StatusNotFound)
-			return
-		}
+		http.Error(w, "short url not found", http.StatusNotFound)
+		return
 	}
 }
 
