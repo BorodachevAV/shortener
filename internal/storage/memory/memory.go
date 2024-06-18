@@ -35,6 +35,6 @@ func (f MapStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	return &resp, nil
 }
 
-func (db MapStorage) CheckDuplicateURL(originalURL string) (string, error) {
+func (f MapStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
 }

@@ -46,6 +46,9 @@ func (f FileStorage) WriteURL(sd *storage.ShortenerData) error {
 	result = append(result, '\n')
 	log.Println(string(result))
 	file, err := os.OpenFile(f.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
 	_, err = file.Write(result)
 	file.Close()
 	return err
@@ -83,6 +86,6 @@ func (f FileStorage) WriteBatch(data []*storage.ShortenerData) error {
 	return nil
 }
 
-func (db FileStorage) CheckDuplicateURL(originalURL string) (string, error) {
+func (f FileStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
 }

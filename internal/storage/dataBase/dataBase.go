@@ -1,4 +1,4 @@
-package data_base
+package dataBase
 
 import (
 	"context"
@@ -106,20 +106,6 @@ func (db DBStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 		return nil, nil
 	}
 
-}
-
-func (db DBStorage) GetShortUrlByOriginalURL(URL string) (*storage.ShortenerData, error) {
-	var shortURL string
-	db.db.QueryRow(
-		"SELECT short_url FROM url_storage where original_url =$1", URL).Scan(&shortURL)
-	// готовим переменную для чтения результата
-	if shortURL != "" {
-		return &storage.ShortenerData{
-			ShortURL: shortURL,
-		}, nil
-	} else {
-		return nil, nil
-	}
 }
 
 func (db DBStorage) CheckDuplicateURL(originalURL string) (string, error) {
