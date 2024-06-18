@@ -16,7 +16,7 @@ import (
 func TestShortener(t *testing.T) {
 	sh := ShortenerHandler{
 		storage: memory.MapStorage{
-			&sync.Map{},
+			UrlsStorage: &sync.Map{},
 		},
 	}
 	t.Run("Get 404", func(t *testing.T) {

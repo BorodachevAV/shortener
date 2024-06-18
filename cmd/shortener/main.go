@@ -134,7 +134,7 @@ func main() {
 		sh.storage = storage
 	} else {
 		storage := memory.MapStorage{
-			&sync.Map{},
+			UrlsStorage: &sync.Map{},
 		}
 		sh.storage = storage
 	}
