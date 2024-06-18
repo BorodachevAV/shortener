@@ -3,19 +3,26 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/BorodachevAV/shortener/internal/storage/memory"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
 func TestShortener(t *testing.T) {
+	sh := ShortenerHandler{
+		storage: memory.MapStorage{
+			&sync.Map{},
+		},
+	}
 	t.Run("Get 404", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodGet, "/123", nil)
 		w := httptest.NewRecorder()
-		expand(w, request)
+		sh.expand(w, request)
 
 		res := w.Result()
 		assert.Equal(t, 404, res.StatusCode)
@@ -27,7 +34,7 @@ func TestShortener(t *testing.T) {
 		bodyReader := strings.NewReader(url)
 		request := httptest.NewRequest(http.MethodPost, "/", bodyReader)
 		w := httptest.NewRecorder()
-		shorten(w, request)
+		sh.shorten(w, request)
 		shortURL := w.Result().Body
 		shortURL.Close()
 		buf := new(bytes.Buffer)
@@ -40,7 +47,7 @@ func TestShortener(t *testing.T) {
 		rctx.URLParams.Add("id", respBytes)
 		request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
 		w = httptest.NewRecorder()
-		expand(w, request)
+		sh.expand(w, request)
 		res := w.Result()
 		res.Body.Close()
 		assert.Equal(t, 307, res.StatusCode)
@@ -50,7 +57,7 @@ func TestShortener(t *testing.T) {
 		bodyReader := strings.NewReader(`https://stackoverflow.com/`)
 		request := httptest.NewRequest(http.MethodPost, "/", bodyReader)
 		w := httptest.NewRecorder()
-		shorten(w, request)
+		sh.shorten(w, request)
 
 		res := w.Result()
 		res.Body.Close()
