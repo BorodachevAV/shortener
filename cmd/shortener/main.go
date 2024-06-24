@@ -123,13 +123,13 @@ func main() {
 		defer cancel()
 		storage, err := database.NewDBStorage(conf.Cfg.DataBaseDNS, ctx)
 		if err != nil {
-			log.Println(err.Error())
+			log.Fatal(err.Error())
 		}
 		sh.storage = storage
 	} else if conf.Cfg.FileStoragePath != "" {
 		storage, err := file.NewFileStorage(conf.Cfg.FileStoragePath)
 		if err != nil {
-			log.Println(err.Error())
+			log.Fatal(err.Error())
 		}
 		sh.storage = storage
 	} else {
@@ -147,6 +147,6 @@ func main() {
 	r.Post(`/api/shorten/batch`, sh.shortenBatch)
 	r.Get(`/{id}`, sh.expand)
 	r.Get(`/ping`, pingDB)
-
+	r.Get(`/api/user/urls`, sh.getUserURLs)
 	log.Fatal(http.ListenAndServe(conf.Cfg.ServerAddress, r))
 }

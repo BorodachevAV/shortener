@@ -15,7 +15,10 @@ type FileStorage struct {
 }
 
 func NewFileStorage(filename string) (*FileStorage, error) {
-
+	_, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
 	return &FileStorage{
 		filename: filename,
 	}, nil
@@ -83,4 +86,8 @@ func (f FileStorage) WriteBatch(data []*storage.ShortenerData) error {
 
 func (f FileStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
+}
+
+func (f FileStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	return nil, nil
 }

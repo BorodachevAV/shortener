@@ -38,3 +38,7 @@ func (f MapStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 func (f MapStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
 }
+
+func (f MapStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	return nil, nil
+}

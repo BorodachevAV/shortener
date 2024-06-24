@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/BorodachevAV/shortener/internal/auth"
 	"github.com/BorodachevAV/shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type ShortenerHandler struct {
@@ -25,6 +27,11 @@ type ShortenJSONRequest struct {
 type ShortenBatchRequest struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
+}
+
+type UserURLResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
 
 type ShortenBatchResponse struct {
@@ -44,9 +51,34 @@ func WriteBatchData(ss storage.ShortenerStorage, sd []*storage.ShortenerData) er
 	return ss.WriteBatch(sd)
 }
 
+func GetUserURLs(ss storage.ShortenerStorage, userID string) ([]*storage.ShortenerData, error) {
+	return ss.GetUserURLs(userID)
+}
+
 func (sh ShortenerHandler) shorten(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
+	var userIDValue string
+	userID, err := r.Cookie("UserID")
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			userID, err := auth.BuildJWTString()
+			if err != nil {
+				log.Println(err)
+			}
+			cookies := &http.Cookie{
+				Name:  "UserID",
+				Value: userID,
+			}
+			http.SetCookie(w, cookies)
+			userIDValue = userID
+		} else {
+			log.Println(err)
+		}
+	} else {
+		userIDValue = strings.TrimSpace(userID.Value)
+	}
+
 	output, _ := io.ReadAll(r.Body)
 	//читаем тело
 	if r.Header.Get("Content-Encoding") == "gzip" {
@@ -65,12 +97,13 @@ func (sh ShortenerHandler) shorten(w http.ResponseWriter, r *http.Request) {
 	//генерим короткий url
 	shortURL := randString(8)
 	// сохраняем в мапе
-	_, err := url.Parse(strOutput)
+	_, err = url.Parse(strOutput)
 	if err != nil {
 		http.Error(w, "not url", http.StatusBadRequest)
 		return
 	}
 	sd := &storage.ShortenerData{
+		UserID:      auth.GetUserId(userIDValue),
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: string(output),
 	}
@@ -97,7 +130,6 @@ func (sh ShortenerHandler) shortenBatch(w http.ResponseWriter, r *http.Request) 
 	var buf bytes.Buffer
 	var sdBatch []*storage.ShortenerData
 	var Response []ShortenBatchResponse
-	// читаем тело запроса
 
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
@@ -136,9 +168,31 @@ func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
+
+	var userIDValue string
+	userID, err := r.Cookie("UserID")
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			userID, err := auth.BuildJWTString()
+			if err != nil {
+				log.Println(err)
+			}
+			cookies := &http.Cookie{
+				Name:  "UserID",
+				Value: userID,
+			}
+			http.SetCookie(w, cookies)
+			userIDValue = userID
+		} else {
+			log.Println(err)
+		}
+	} else {
+		userIDValue = userID.Value
+	}
+
 	// читаем тело запроса
 
-	_, err := buf.ReadFrom(r.Body)
+	_, err = buf.ReadFrom(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -161,6 +215,7 @@ func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sd := &storage.ShortenerData{
+		UserID:      auth.GetUserId(userIDValue),
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: req.URL,
 	}
@@ -197,6 +252,33 @@ func (sh ShortenerHandler) expand(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "short url not found", http.StatusNotFound)
 		return
+	}
+}
+
+func (sh ShortenerHandler) getUserURLs(w http.ResponseWriter, r *http.Request) {
+	var Response []UserURLResponse
+	userID, err := r.Cookie("UserID")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	val, err := GetUserURLs(sh.storage, auth.GetUserId(userID.Value))
+	if err != nil {
+		w.WriteHeader(http.StatusNoContent)
+	}
+	for _, v := range val {
+		Response = append(Response, UserURLResponse{
+			v.ShortURL,
+			v.OriginalURL,
+		})
+	}
+	respBody, _ := json.Marshal(Response)
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(respBody)
+	if err != nil {
+		log.Println(err.Error())
 	}
 }
 

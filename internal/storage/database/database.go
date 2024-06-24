@@ -33,6 +33,28 @@ func NewDBStorage(DNS string, ctx context.Context) (*DBStorage, error) {
 
 func (db DBStorage) CreateSchema() error {
 
+	createShema :=
+		`CREATE TABLE IF NOT EXISTS url_storage(
+			short_url VARCHAR(200) PRIMARY KEY,
+			original_url VARCHAR(200) NOT NULL UNIQUE,
+    		user_id VARCHAR(200)
+		)`
+
+	_, err := db.db.Query(createShema)
+	return err
+}
+
+func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
+	isDuplicate, _ := db.CheckDuplicateURL(sd.OriginalURL)
+	if isDuplicate != "" {
+		return storage.ErrDuplicate
+	}
+
+	_, err := db.db.Query("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)", sd.ShortURL, sd.OriginalURL, sd.UserID)
+	return err
+}
+
+func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 	tx, err := db.db.BeginTx(db.ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start a transaction: %w", err)
@@ -44,15 +66,15 @@ func (db DBStorage) CreateSchema() error {
 			}
 		}
 	}()
-
-	createShema :=
-		`CREATE TABLE IF NOT EXISTS url_storage(
-			short_url VARCHAR(200) PRIMARY KEY,
-			original_url VARCHAR(200) NOT NULL UNIQUE
-		)`
-
-	if _, err := tx.ExecContext(db.ctx, createShema); err != nil {
-		return fmt.Errorf("failed to execute statement `%s`: %w", createShema, err)
+	stmt, err := tx.Prepare("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, sd := range sd {
+		if _, err := stmt.Exec(sd.ShortURL, sd.OriginalURL, sd.UserID); err != nil {
+			tx.Rollback()
+			return err
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -61,38 +83,9 @@ func (db DBStorage) CreateSchema() error {
 	return nil
 }
 
-func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
-	isDuplicate, _ := db.CheckDuplicateURL(sd.OriginalURL)
-	if isDuplicate != "" {
-		return storage.ErrDuplicate
-	}
-	tx, err := db.db.Begin()
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(context.Background(),
-		"INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
-	if err != nil {
-		// если ошибка, то откатываем изменения
-		tx.Rollback()
-		return err
-	}
-	// завершаем транзакцию
-	return tx.Commit()
-}
-
-func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
-	for _, data := range sd {
-		err := db.WriteURL(data)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (db DBStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	var origURL string
+
 	db.db.QueryRow(
 		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&origURL)
 	// готовим переменную для чтения результата
@@ -118,4 +111,19 @@ func (db DBStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	} else {
 		return "", nil
 	}
+}
+
+func (db DBStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	var results []*storage.ShortenerData
+	rows, err := db.db.Query(
+		"SELECT short_url, original_url FROM url_storage where user_id =$1", userID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		sd := &storage.ShortenerData{}
+		rows.Scan(&sd.ShortURL, &sd.OriginalURL)
+		results = append(results, sd)
+	}
+	return results, nil
 }
