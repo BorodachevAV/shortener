@@ -39,7 +39,10 @@ func (db DBStorage) CreateSchema() error {
 			original_url VARCHAR(200) NOT NULL UNIQUE
 		)`
 
-	_, err := db.db.Query(createShema)
+	rows, err := db.db.Query(createShema)
+	if rows.Err() != nil {
+		return rows.Err()
+	}
 	if err != nil {
 		return err
 	}
@@ -52,7 +55,10 @@ func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
 		return storage.ErrDuplicate
 	}
 
-	_, err := db.db.Query("INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
+	rows, err := db.db.Query("INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
+	if rows.Err() != nil {
+		return rows.Err()
+	}
 	if err != nil {
 		return err
 	}
