@@ -40,7 +40,10 @@ func (db DBStorage) CreateSchema() error {
 		)`
 
 	_, err := db.db.Query(createShema)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
@@ -50,7 +53,10 @@ func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
 	}
 
 	_, err := db.db.Query("INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
