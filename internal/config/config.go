@@ -8,18 +8,20 @@ type ShortenerConfig struct {
 	ServerAddress   string
 	BaseURL         string
 	FileStoragePath string
+	DataBaseDNS     string
 }
 
 type Config struct {
 	Cfg ShortenerConfig
 }
 
-func New() *Config {
+func NewConfig() *Config {
 	return &Config{
 		Cfg: ShortenerConfig{
 			ServerAddress:   getEnv("SERVER_ADDRESS", ""),
 			BaseURL:         getEnv("BASE_URL", ""),
 			FileStoragePath: getEnv("FILE_STORAGE_PATH", ""),
+			DataBaseDNS:     getEnv("DATABASE_DSN", ""),
 		},
 	}
 }
