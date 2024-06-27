@@ -37,7 +37,8 @@ func (db DBStorage) CreateSchema() error {
 		`CREATE TABLE IF NOT EXISTS url_storage(
 			short_url VARCHAR(200) PRIMARY KEY,
 			original_url VARCHAR(200) NOT NULL UNIQUE,
-    		user_id VARCHAR(200)
+    		user_id VARCHAR(200),
+    		deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 		)`
 
 	_, err := db.db.Query(createShema)
@@ -126,4 +127,33 @@ func (db DBStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error)
 		results = append(results, sd)
 	}
 	return results, nil
+}
+
+func (db DBStorage) DeleteUserURLs(sd []*storage.ShortenerData) error {
+	tx, err := db.db.BeginTx(db.ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to start a transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			if !errors.Is(err, sql.ErrTxDone) {
+				log.Printf("failed to rollback the transaction: %v", err)
+			}
+		}
+	}()
+	stmt, err := tx.Prepare("UPDATE url_storage SET deleted_flag = TRUE where (short_url=$1 and user_id=$2)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, sd := range sd {
+		if _, err := stmt.Exec(sd.ShortURL, sd.UserID); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit the transaction: %w", err)
+	}
+	return nil
 }

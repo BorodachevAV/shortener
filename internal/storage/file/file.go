@@ -91,3 +91,7 @@ func (f FileStorage) CheckDuplicateURL(originalURL string) (string, error) {
 func (f FileStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
 	return nil, nil
 }
+
+func (f FileStorage) DeleteUserURLs([]*storage.ShortenerData) error {
+	return nil
+}

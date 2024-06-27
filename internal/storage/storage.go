@@ -17,4 +17,5 @@ type ShortenerStorage interface {
 	WriteBatch([]*ShortenerData) error
 	CheckDuplicateURL(originalURL string) (string, error)
 	GetUserURLs(userID string) ([]*ShortenerData, error)
+	DeleteUserURLs([]*ShortenerData) error
 }
