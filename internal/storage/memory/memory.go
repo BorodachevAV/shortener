@@ -31,10 +31,19 @@ func (f MapStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	}
 	resp := storage.ShortenerData{
 		OriginalURL: val.(string),
+		DeletedFlag: false,
 	}
 	return &resp, nil
 }
 
 func (f MapStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
+}
+
+func (f MapStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	return nil, nil
+}
+
+func (f MapStorage) DeleteUserURLs([]*storage.ShortenerData) error {
+	return nil
 }

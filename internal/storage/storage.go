@@ -5,9 +5,11 @@ import "errors"
 var ErrDuplicate = errors.New("duplicated originalUrl")
 
 type ShortenerData struct {
-	ID          uint   `json:"uuid"`
+	ID          uint   `json:"uuID"`
+	UserID      string `json:"userID"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	DeletedFlag bool   `json:"deleted_flag"`
 }
 
 type ShortenerStorage interface {
@@ -15,4 +17,6 @@ type ShortenerStorage interface {
 	ReadURL(shortURL string) (*ShortenerData, error)
 	WriteBatch([]*ShortenerData) error
 	CheckDuplicateURL(originalURL string) (string, error)
+	GetUserURLs(userID string) ([]*ShortenerData, error)
+	DeleteUserURLs([]*ShortenerData) error
 }

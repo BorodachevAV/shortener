@@ -36,17 +36,20 @@ func (db DBStorage) CreateSchema() error {
 	createShema :=
 		`CREATE TABLE IF NOT EXISTS url_storage(
 			short_url VARCHAR(200) PRIMARY KEY,
-			original_url VARCHAR(200) NOT NULL UNIQUE
+			original_url VARCHAR(200) NOT NULL UNIQUE,
+    		user_id VARCHAR(200),
+    		deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 		)`
 
 	rows, err := db.db.Query(createShema)
-	if rows.Err() != nil {
-		return rows.Err()
-	}
 	if err != nil {
 		return err
 	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
 	return nil
+
 }
 
 func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
@@ -55,12 +58,12 @@ func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
 		return storage.ErrDuplicate
 	}
 
-	rows, err := db.db.Query("INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)", sd.ShortURL, sd.OriginalURL)
-	if rows.Err() != nil {
-		return rows.Err()
-	}
+	rows, err := db.db.Query("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)", sd.ShortURL, sd.OriginalURL, sd.UserID)
 	if err != nil {
 		return err
+	}
+	if rows.Err() != nil {
+		return rows.Err()
 	}
 	return nil
 }
@@ -77,12 +80,13 @@ func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 			}
 		}
 	}()
-	stmt, err := tx.Prepare("INSERT INTO url_storage (short_url, original_url) VALUES($1,$2)")
+	stmt, err := tx.Prepare("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, sd := range sd {
-		if _, err := stmt.Exec(sd.ShortURL, sd.OriginalURL); err != nil {
+		if _, err := stmt.Exec(sd.ShortURL, sd.OriginalURL, sd.UserID); err != nil {
+
 			tx.Rollback()
 			return err
 		}
@@ -96,13 +100,14 @@ func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 
 func (db DBStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	var origURL string
+	var isDeleted bool
 
 	db.db.QueryRow(
-		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&origURL)
-	// готовим переменную для чтения результата
+		"SELECT original_url, deleted_flag FROM url_storage where short_url =$1", URL).Scan(&origURL, &isDeleted)
 	if origURL != "" {
 		return &storage.ShortenerData{
 			OriginalURL: origURL,
+			DeletedFlag: isDeleted,
 		}, nil
 	} else {
 		return nil, nil
@@ -120,4 +125,54 @@ func (db DBStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	} else {
 		return "", nil
 	}
+}
+
+func (db DBStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	var results []*storage.ShortenerData
+	rows, err := db.db.Query(
+		"SELECT short_url, original_url FROM url_storage where user_id =$1", userID)
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	for rows.Next() {
+		sd := &storage.ShortenerData{}
+		rows.Scan(&sd.ShortURL, &sd.OriginalURL)
+		results = append(results, sd)
+	}
+	return results, nil
+}
+
+func (db DBStorage) DeleteUserURLs(sd []*storage.ShortenerData) error {
+	log.Println("len is", len(sd))
+
+	tx, err := db.db.BeginTx(db.ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to start a transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			if !errors.Is(err, sql.ErrTxDone) {
+				log.Printf("failed to rollback the transaction: %v", err)
+			}
+		}
+	}()
+	stmt, err := tx.Prepare("UPDATE url_storage SET deleted_flag = TRUE where (short_url=$1 and user_id=$2)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, sd := range sd {
+		log.Println("sd is", sd.ShortURL, sd.UserID)
+		if _, err := stmt.Exec(sd.ShortURL, sd.UserID); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit the transaction: %w", err)
+	}
+	return nil
 }

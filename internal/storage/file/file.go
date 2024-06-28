@@ -31,11 +31,13 @@ func (f FileStorage) WriteURL(sd *storage.ShortenerData) error {
 		newData.ID = data.ID + 1
 		newData.ShortURL = sd.ShortURL
 		newData.OriginalURL = sd.OriginalURL
+		newData.DeletedFlag = false
 
 	} else {
 		newData.ID = 1
 		newData.ShortURL = sd.ShortURL
 		newData.OriginalURL = sd.OriginalURL
+		newData.DeletedFlag = false
 	}
 	result, err := json.Marshal(&newData)
 	if err != nil {
@@ -86,4 +88,12 @@ func (f FileStorage) WriteBatch(data []*storage.ShortenerData) error {
 
 func (f FileStorage) CheckDuplicateURL(originalURL string) (string, error) {
 	return "", nil
+}
+
+func (f FileStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error) {
+	return nil, nil
+}
+
+func (f FileStorage) DeleteUserURLs([]*storage.ShortenerData) error {
+	return nil
 }
