@@ -107,7 +107,7 @@ func (sh ShortenerHandler) shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sd := &storage.ShortenerData{
-		UserID:      auth.GetUserId(userIDValue),
+		UserID:      auth.GetUserID(userIDValue),
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: string(output),
 	}
@@ -176,13 +176,15 @@ func (sh ShortenerHandler) deleteUserURLs(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	id := auth.GetUserId(userID.Value)
+	id := auth.GetUserID(userID.Value)
+
+	_, err = buf.ReadFrom(r.Body)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_, err = buf.ReadFrom(r.Body)
+
 	err = json.Unmarshal(buf.Bytes(), &batch)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -194,7 +196,7 @@ func (sh ShortenerHandler) deleteUserURLs(w http.ResponseWriter, r *http.Request
 			UserID:   id,
 		})
 	}
-	DeleteUserUrls(sh.storage, sdBatch)
+	err = DeleteUserUrls(sh.storage, sdBatch)
 
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
@@ -258,7 +260,7 @@ func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sd := &storage.ShortenerData{
-		UserID:      auth.GetUserId(userIDValue),
+		UserID:      auth.GetUserID(userIDValue),
 		ShortURL:    fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, shortURL),
 		OriginalURL: req.URL,
 	}
@@ -309,7 +311,7 @@ func (sh ShortenerHandler) getUserURLs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	val, err := GetUserURLs(sh.storage, auth.GetUserId(userID.Value))
+	val, err := GetUserURLs(sh.storage, auth.GetUserID(userID.Value))
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
 	}

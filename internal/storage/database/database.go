@@ -42,15 +42,14 @@ func (db DBStorage) CreateSchema() error {
 		)`
 
 	rows, err := db.db.Query(createShema)
-  if err != nil {
+	if err != nil {
 		return err
 	}
-  if rows.Err() != nil {
+	if rows.Err() != nil {
 		return rows.Err()
 	}
 	return nil
-	
-	
+
 }
 
 func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
@@ -59,8 +58,14 @@ func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
 		return storage.ErrDuplicate
 	}
 
-	_, err := db.db.Query("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)", sd.ShortURL, sd.OriginalURL, sd.UserID)
-	return err
+	rows, err := db.db.Query("INSERT INTO url_storage (short_url, original_url, user_id) VALUES($1,$2,$3)", sd.ShortURL, sd.OriginalURL, sd.UserID)
+	if err != nil {
+		return err
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+	return nil
 }
 
 func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
@@ -128,6 +133,9 @@ func (db DBStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error)
 		"SELECT short_url, original_url FROM url_storage where user_id =$1", userID)
 	if err != nil {
 		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
 	}
 	for rows.Next() {
 		sd := &storage.ShortenerData{}

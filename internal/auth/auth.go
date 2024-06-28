@@ -11,7 +11,7 @@ type Claims struct {
 	UserID string
 }
 
-const SECRET_KEY = "secretkey"
+const secretKey = "secretkey"
 
 func BuildJWTString() (string, error) {
 	// создаём новый токен с алгоритмом подписи HS256 и утверждениями — Claims
@@ -21,7 +21,7 @@ func BuildJWTString() (string, error) {
 	})
 
 	// создаём строку токена
-	tokenString, err := token.SignedString([]byte(SECRET_KEY))
+	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
 		return "", err
 	}
@@ -30,11 +30,11 @@ func BuildJWTString() (string, error) {
 	return tokenString, nil
 }
 
-func GetUserId(tokenString string) string {
+func GetUserID(tokenString string) string {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
-			return []byte(SECRET_KEY), nil
+			return []byte(secretKey), nil
 		})
 	if err != nil {
 		return ""
