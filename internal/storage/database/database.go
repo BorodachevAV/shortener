@@ -41,8 +41,16 @@ func (db DBStorage) CreateSchema() error {
     		deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 		)`
 
-	_, err := db.db.Query(createShema)
-	return err
+	rows, err := db.db.Query(createShema)
+  if err != nil {
+		return err
+	}
+  if rows.Err() != nil {
+		return rows.Err()
+	}
+	return nil
+	
+	
 }
 
 func (db DBStorage) WriteURL(sd *storage.ShortenerData) error {
@@ -73,6 +81,7 @@ func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 	}
 	for _, sd := range sd {
 		if _, err := stmt.Exec(sd.ShortURL, sd.OriginalURL, sd.UserID); err != nil {
+
 			tx.Rollback()
 			return err
 		}
@@ -87,9 +96,9 @@ func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 func (db DBStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	var origURL string
 	var isDeleted bool
+
 	db.db.QueryRow(
 		"SELECT original_url, deleted_flag FROM url_storage where short_url =$1", URL).Scan(&origURL, &isDeleted)
-	// готовим переменную для чтения результата
 	if origURL != "" {
 		return &storage.ShortenerData{
 			OriginalURL: origURL,
