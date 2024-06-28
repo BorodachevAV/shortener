@@ -86,15 +86,14 @@ func (db DBStorage) WriteBatch(sd []*storage.ShortenerData) error {
 
 func (db DBStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	var origURL string
-
+	var isDeleted bool
 	db.db.QueryRow(
-		"SELECT original_url FROM url_storage where short_url =$1", URL).Scan(&origURL)
+		"SELECT original_url, deleted_flag FROM url_storage where short_url =$1", URL).Scan(&origURL, &isDeleted)
 	// готовим переменную для чтения результата
 	if origURL != "" {
-		log.Println("orig_url not null")
-		log.Println(origURL)
 		return &storage.ShortenerData{
 			OriginalURL: origURL,
+			DeletedFlag: isDeleted,
 		}, nil
 	} else {
 		return nil, nil
@@ -130,6 +129,8 @@ func (db DBStorage) GetUserURLs(userID string) ([]*storage.ShortenerData, error)
 }
 
 func (db DBStorage) DeleteUserURLs(sd []*storage.ShortenerData) error {
+	log.Println("len is", len(sd))
+
 	tx, err := db.db.BeginTx(db.ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start a transaction: %w", err)
@@ -146,6 +147,7 @@ func (db DBStorage) DeleteUserURLs(sd []*storage.ShortenerData) error {
 		log.Fatal(err)
 	}
 	for _, sd := range sd {
+		log.Println("sd is", sd.ShortURL, sd.UserID)
 		if _, err := stmt.Exec(sd.ShortURL, sd.UserID); err != nil {
 			tx.Rollback()
 			return err

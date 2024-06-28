@@ -31,11 +31,13 @@ func (f FileStorage) WriteURL(sd *storage.ShortenerData) error {
 		newData.ID = data.ID + 1
 		newData.ShortURL = sd.ShortURL
 		newData.OriginalURL = sd.OriginalURL
+		newData.DeletedFlag = false
 
 	} else {
 		newData.ID = 1
 		newData.ShortURL = sd.ShortURL
 		newData.OriginalURL = sd.OriginalURL
+		newData.DeletedFlag = false
 	}
 	result, err := json.Marshal(&newData)
 	if err != nil {

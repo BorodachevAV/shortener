@@ -148,5 +148,6 @@ func main() {
 	r.Get(`/{id}`, sh.expand)
 	r.Get(`/ping`, pingDB)
 	r.Get(`/api/user/urls`, sh.getUserURLs)
+	r.Delete(`/api/user/urls`, sh.deleteUserURLs)
 	log.Fatal(http.ListenAndServe(conf.Cfg.ServerAddress, r))
 }

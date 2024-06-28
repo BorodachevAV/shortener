@@ -55,6 +55,10 @@ func GetUserURLs(ss storage.ShortenerStorage, userID string) ([]*storage.Shorten
 	return ss.GetUserURLs(userID)
 }
 
+func DeleteUserUrls(ss storage.ShortenerStorage, sd []*storage.ShortenerData) error {
+	return ss.DeleteUserURLs(sd)
+}
+
 func (sh ShortenerHandler) shorten(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
 	w.Header().Add("Host", conf.Cfg.ServerAddress)
@@ -162,6 +166,45 @@ func (sh ShortenerHandler) shortenBatch(w http.ResponseWriter, r *http.Request) 
 
 }
 
+func (sh ShortenerHandler) deleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	var batch []string
+	var buf bytes.Buffer
+	var sdBatch []*storage.ShortenerData
+
+	userID, err := r.Cookie("UserID")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	id := auth.GetUserId(userID.Value)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	_, err = buf.ReadFrom(r.Body)
+	err = json.Unmarshal(buf.Bytes(), &batch)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	log.Println(batch)
+	for _, URL := range batch {
+		sdBatch = append(sdBatch, &storage.ShortenerData{
+			ShortURL: fmt.Sprintf("%s/%s", conf.Cfg.BaseURL, URL),
+			UserID:   id,
+		})
+	}
+	DeleteUserUrls(sh.storage, sdBatch)
+
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Host", conf.Cfg.ServerAddress)
+	w.WriteHeader(http.StatusAccepted)
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+}
+
 func (sh ShortenerHandler) shortenJSON(w http.ResponseWriter, r *http.Request) {
 	var req ShortenJSONRequest
 	var buf bytes.Buffer
@@ -247,6 +290,10 @@ func (sh ShortenerHandler) expand(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	if val != nil {
+		if val.DeletedFlag {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
 		w.Header().Add("Location", val.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {

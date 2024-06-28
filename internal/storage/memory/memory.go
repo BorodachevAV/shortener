@@ -31,6 +31,7 @@ func (f MapStorage) ReadURL(URL string) (*storage.ShortenerData, error) {
 	}
 	resp := storage.ShortenerData{
 		OriginalURL: val.(string),
+		DeletedFlag: false,
 	}
 	return &resp, nil
 }
